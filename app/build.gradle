@@ -40,6 +40,6 @@ dependencies {
 
     // Displaying images
     implementation 'com.github.bumptech.glide:glide:4.4.0'
-    implementation 'com.google.firebase:firebase-core:15.0.2'
+    implementation 'com.google.firebase:firebase-database:15.0.1'
 }
 apply plugin: 'com.google.gms.google-services'
