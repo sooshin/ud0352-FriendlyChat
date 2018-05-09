@@ -52,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
 
     private String mUsername;
 
+    // Firebase instance variables
     private FirebaseDatabase mFirebaseDatabase;
     private DatabaseReference mMessagesDatabaseReference;
 
@@ -62,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
 
         mUsername = ANONYMOUS;
 
+        // Initialize Firebase components
         mFirebaseDatabase = FirebaseDatabase.getInstance();
         mMessagesDatabaseReference = mFirebaseDatabase.getReference().child("messages");
 
