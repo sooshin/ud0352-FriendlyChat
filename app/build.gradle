@@ -44,6 +44,7 @@ dependencies {
     // Firebase
     implementation 'com.google.firebase:firebase-database:15.0.1'
     implementation 'com.google.firebase:firebase-auth:15.1.0'
+    implementation 'com.google.firebase:firebase-storage:15.0.2'
 
     // FirebaseUI
     implementation 'com.firebaseui:firebase-ui-auth:3.3.1'
