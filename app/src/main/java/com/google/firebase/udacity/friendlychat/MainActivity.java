@@ -31,20 +31,22 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.firebase.ui.auth.AuthUI;
+import com.firebase.ui.database.FirebaseListAdapter;
+import com.firebase.ui.database.FirebaseListOptions;
 import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.ChildEventListener;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig;
@@ -53,10 +55,8 @@ import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
@@ -71,7 +71,6 @@ public class MainActivity extends AppCompatActivity {
     private static final int RC_PHOTO_PICKER = 2;
 
     private ListView mMessageListView;
-    private MessageAdapter mMessageAdapter;
     private ProgressBar mProgressBar;
     private ImageButton mPhotoPickerButton;
     private EditText mMessageEditText;
@@ -82,12 +81,12 @@ public class MainActivity extends AppCompatActivity {
     // Firebase instance variables
     private FirebaseDatabase mFirebaseDatabase;
     private DatabaseReference mMessagesDatabaseReference;
-    private ChildEventListener mChildEventListener;
     private FirebaseAuth mFirebaseAuth;
     private FirebaseAuth.AuthStateListener mAuthStateListener;
     private FirebaseStorage mFirebaseStorage;
     private StorageReference mChatPhotosStorageReference;
     private FirebaseRemoteConfig mFirebaseRemoteConfig;
+    private FirebaseListAdapter<FriendlyMessage> mMessageListAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,10 +111,8 @@ public class MainActivity extends AppCompatActivity {
         mMessageEditText = (EditText) findViewById(R.id.messageEditText);
         mSendButton = (Button) findViewById(R.id.sendButton);
 
-        // Initialize message ListView and its adapter
-        List<FriendlyMessage> friendlyMessages = new ArrayList<>();
-        mMessageAdapter = new MessageAdapter(this, R.layout.item_message, friendlyMessages);
-        mMessageListView.setAdapter(mMessageAdapter);
+        // Use FirebaseUI to populate a ListView
+        populateListView();
 
         // Initialize progress bar
         mProgressBar.setVisibility(ProgressBar.INVISIBLE);
@@ -280,51 +277,53 @@ public class MainActivity extends AppCompatActivity {
         if (mAuthStateListener != null) {
             mFirebaseAuth.removeAuthStateListener(mAuthStateListener);
         }
-        detachDatabaseReadListener();
-        mMessageAdapter.clear();
+        mMessageListAdapter.stopListening();
+    }
+
+    /**
+     * Bind data from the Firebase Realtime Database to the app's UI.
+     * Enable to see the updated message from the app in the chat list.
+     */
+    private void populateListView() {
+        FirebaseListOptions<FriendlyMessage> options = new FirebaseListOptions.Builder<FriendlyMessage>()
+                .setLayout(R.layout.item_message)
+                .setQuery(mMessagesDatabaseReference, FriendlyMessage.class)
+                .build();
+
+        mMessageListAdapter = new FirebaseListAdapter<FriendlyMessage>(options) {
+            @Override
+            protected void populateView(View v, FriendlyMessage model, int position) {
+                // Bind the FriendlyMessage to  the view
+                ImageView photoImageView = v.findViewById(R.id.photoImageView);
+                TextView messageTextView = v.findViewById(R.id.messageTextView);
+                TextView authorTextView = v.findViewById(R.id.nameTextView);
+
+                boolean isPhoto = model.getPhotoUrl() != null;
+                if (isPhoto) {
+                    messageTextView.setVisibility(View.GONE);
+                    photoImageView.setVisibility(View.VISIBLE);
+                    Glide.with(photoImageView.getContext())
+                            .load(model.getPhotoUrl())
+                            .into(photoImageView);
+                } else {
+                    messageTextView.setVisibility(View.VISIBLE);
+                    photoImageView.setVisibility(View.GONE);
+                    messageTextView.setText(model.getText());
+                }
+                authorTextView.setText(model.getName());
+            }
+        };
+        mMessageListView.setAdapter(mMessageListAdapter);
     }
 
     private void onSignedInInitialize(String username) {
         mUsername = username;
-        attachDatabaseReadListener();
+        mMessageListAdapter.startListening();
     }
 
     private void onSignedOutCleanUp() {
         mUsername = ANONYMOUS;
-        mMessageAdapter.clear();
-        detachDatabaseReadListener();
-    }
-
-    private void attachDatabaseReadListener() {
-        if (mChildEventListener == null) {
-            mChildEventListener = new ChildEventListener() {
-                @Override
-                public void onChildAdded(DataSnapshot dataSnapshot, String s) {
-                    FriendlyMessage friendlyMessage = dataSnapshot.getValue(FriendlyMessage.class);
-                    mMessageAdapter.add(friendlyMessage);
-                }
-
-                public void onChildChanged(DataSnapshot dataSnapshot, String s) {
-                }
-
-                public void onChildRemoved(DataSnapshot dataSnapshot) {
-                }
-
-                public void onChildMoved(DataSnapshot dataSnapshot, String s) {
-                }
-
-                public void onCancelled(DatabaseError databaseError) {
-                }
-            };
-            mMessagesDatabaseReference.addChildEventListener(mChildEventListener);
-        }
-    }
-
-    private void detachDatabaseReadListener() {
-        if (mChildEventListener != null) {
-            mMessagesDatabaseReference.removeEventListener(mChildEventListener);
-            mChildEventListener = null;
-        }
+        mMessageListAdapter.stopListening();
     }
 
     // Fetch the config to determine the allowed length of messages.
